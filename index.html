@@ -1,0 +1,765 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>Nimbus Runner | My Dream Flooring</title>
+<style>
+  :root{
+    --dark-teal:#013D3F;
+    --mid-teal:#10888C;
+    --bg-blue:#EDFAFF;
+    --warm-white:#FAFAF8;
+    --orange:#F4931F;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html,body{
+    margin:0;padding:0;width:100%;height:100%;
+    overflow:hidden;overscroll-behavior:none;
+    background:var(--bg-blue);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    touch-action:none;
+  }
+  #gameWrap{
+    position:fixed;inset:0;width:100%;height:100%;
+    display:block;
+  }
+  canvas{
+    display:block;width:100%;height:100%;
+  }
+  #brandTop{
+    position:absolute;top:14px;left:16px;
+    pointer-events:none;
+    user-select:none;
+    z-index:5;
+  }
+  #brandTop .name{
+    font-weight:700;
+    font-size:15px;
+    color:var(--dark-teal);
+    letter-spacing:0.2px;
+  }
+  #brandTop .tag{
+    font-size:10px;
+    color:var(--mid-teal);
+    margin-top:1px;
+  }
+  #hud{
+    position:absolute;top:14px;right:16px;
+    text-align:right;
+    z-index:5;
+    pointer-events:none;
+    user-select:none;
+  }
+  #scorePill{
+    display:inline-block;
+    background:var(--dark-teal);
+    color:var(--warm-white);
+    font-weight:700;
+    font-size:15px;
+    padding:6px 14px;
+    border-radius:999px;
+    box-shadow:0 2px 6px rgba(1,61,63,0.25);
+  }
+  #hiScore{
+    margin-top:6px;
+    font-size:11px;
+    color:var(--dark-teal);
+    background:rgba(255,255,255,0.6);
+    display:inline-block;
+    padding:3px 10px;
+    border-radius:999px;
+  }
+  .overlay{
+    position:absolute;inset:0;
+    display:flex;flex-direction:column;
+    align-items:center;justify-content:center;
+    text-align:center;
+    z-index:10;
+    padding:20px;
+  }
+  #startScreen{
+    background:transparent;
+  }
+  #startScreen .brandBig{
+    font-weight:700;
+    font-size:clamp(20px,5vw,30px);
+    color:var(--dark-teal);
+    margin-bottom:2px;
+  }
+  #startScreen .tagBig{
+    font-size:clamp(12px,3vw,15px);
+    color:var(--mid-teal);
+    margin-bottom:22px;
+  }
+  #startScreen .prompt{
+    font-weight:700;
+    font-size:clamp(16px,4.5vw,22px);
+    color:var(--warm-white);
+    background:var(--mid-teal);
+    padding:12px 26px;
+    border-radius:14px;
+    box-shadow:0 4px 10px rgba(1,61,63,0.25);
+    margin-top:18px;
+  }
+  #startScreen .bestRow{
+    margin-top:16px;
+    font-size:13px;
+    color:var(--dark-teal);
+  }
+  #gameOverScreen{
+    background:rgba(1,61,63,0.9);
+    display:none;
+  }
+  #gameOverScreen h1{
+    color:var(--warm-white);
+    font-size:clamp(30px,8vw,48px);
+    margin:0 0 10px 0;
+    font-weight:800;
+  }
+  #gameOverScreen .finalScore{
+    color:var(--warm-white);
+    font-size:clamp(18px,5vw,24px);
+    margin-bottom:4px;
+  }
+  #gameOverScreen .finalHigh{
+    color:#B9E4E2;
+    font-size:clamp(13px,3.5vw,16px);
+    margin-bottom:24px;
+  }
+  #playAgainBtn{
+    background:var(--orange);
+    color:var(--dark-teal);
+    border:none;
+    font-weight:800;
+    font-size:clamp(16px,4.5vw,20px);
+    padding:14px 34px;
+    border-radius:14px;
+    cursor:pointer;
+    box-shadow:0 4px 10px rgba(0,0,0,0.25);
+  }
+  #playAgainBtn:active{
+    transform:scale(0.96);
+  }
+</style>
+</head>
+<body>
+<div id="gameWrap">
+  <canvas id="game"></canvas>
+
+  <div id="brandTop">
+    <div class="name">My Dream Flooring</div>
+    <div class="tag">Beautiful flooring. Paid your way.</div>
+  </div>
+
+  <div id="hud">
+    <div id="scorePill">0</div>
+    <div id="hiScore">Best: 0</div>
+  </div>
+
+  <div id="startScreen" class="overlay">
+    <div class="brandBig">My Dream Flooring</div>
+    <div class="tagBig">Beautiful flooring. Paid your way.</div>
+    <div class="prompt" id="startPrompt">Tap to Start</div>
+    <div class="bestRow" id="startBest"></div>
+  </div>
+
+  <div id="gameOverScreen" class="overlay">
+    <h1>Game Over</h1>
+    <div class="finalScore" id="finalScore">Score: 0</div>
+    <div class="finalHigh" id="finalHigh">Best: 0</div>
+    <button id="playAgainBtn">Play Again</button>
+  </div>
+</div>
+
+<script>
+(function(){
+"use strict";
+
+/* ---------- Sprite assets (relative paths, GitHub Pages / mobile safe) ---------- */
+function loadSprite(relPath, onReady, onFail){
+  var img = new Image();
+  img.onload = function(){ onReady(); };
+  img.onerror = function(){ onFail(); console.warn('Nimbus Runner: failed to load asset', relPath); };
+  img.src = relPath;
+  return img;
+}
+
+var nimbusReady = false, nimbusFailed = false;
+var nimbusImg = loadSprite('NimbusPose.png', function(){ nimbusReady = true; }, function(){ nimbusFailed = true; });
+
+var vanReady = false, vanFailed = false;
+var vanImg = loadSprite('17.png', function(){ vanReady = true; }, function(){ vanFailed = true; });
+
+var houseBigReady = false, houseBigFailed = false;
+var houseBigImg = loadSprite('18.png', function(){ houseBigReady = true; }, function(){ houseBigFailed = true; });
+
+var houseSmallReady = false, houseSmallFailed = false;
+var houseSmallImg = loadSprite('19.png', function(){ houseSmallReady = true; }, function(){ houseSmallFailed = true; });
+
+var bgReady = false, bgFailed = false;
+var bgImg = loadSprite('Background.png', function(){ bgReady = true; }, function(){ bgFailed = true; });
+
+var floorReady = false, floorFailed = false;
+var floorImg = loadSprite('Floor.png', function(){ floorReady = true; }, function(){ floorFailed = true; });
+
+/* ---------- Canvas setup ---------- */
+var canvas = document.getElementById('game');
+var ctx = canvas.getContext('2d');
+var DPR = Math.min(window.devicePixelRatio || 1, 2);
+var W = 0, H = 0;
+
+function resize(){
+  W = window.innerWidth;
+  H = window.innerHeight;
+  canvas.width = Math.floor(W * DPR);
+  canvas.height = Math.floor(H * DPR);
+  canvas.style.width = W + 'px';
+  canvas.style.height = H + 'px';
+  ctx.setTransform(DPR,0,0,DPR,0,0);
+  groundY = H * 0.78;
+}
+window.addEventListener('resize', resize);
+window.addEventListener('orientationchange', resize);
+
+/* ---------- Audio (Web Audio API, generated) ---------- */
+var actx = null;
+function ensureAudio(){
+  if(!actx){
+    try{ actx = new (window.AudioContext || window.webkitAudioContext)(); }catch(e){ actx = null; }
+  }
+  if(actx && actx.state === 'suspended'){ actx.resume(); }
+}
+function beep(freq, dur, type, vol, startDelay, glideTo){
+  if(!actx) return;
+  var t0 = actx.currentTime + (startDelay||0);
+  var osc = actx.createOscillator();
+  var gain = actx.createGain();
+  osc.type = type || 'sine';
+  osc.frequency.setValueAtTime(freq, t0);
+  if(glideTo){ osc.frequency.linearRampToValueAtTime(glideTo, t0 + dur); }
+  gain.gain.setValueAtTime(0, t0);
+  gain.gain.linearRampToValueAtTime(vol||0.15, t0 + 0.01);
+  gain.gain.exponentialRampToValueAtTime(0.001, t0 + dur);
+  osc.connect(gain); gain.connect(actx.destination);
+  osc.start(t0); osc.stop(t0 + dur + 0.02);
+}
+function sfxJump(){ beep(420, 0.14, 'square', 0.12, 0, 700); }
+function sfxCollect(){ beep(880, 0.09, 'triangle', 0.14, 0, 1200); beep(1200,0.08,'triangle',0.10,0.06); }
+function sfxGameOver(){ beep(300,0.25,'sawtooth',0.14,0,120); beep(180,0.3,'sawtooth',0.12,0.15,80); }
+
+/* ---------- Game constants ---------- */
+var GROUND_SPEED_BASE = 6;
+var GRAVITY = 0.85;
+var JUMP_VELOCITY = -15.5;
+var NIMBUS_SIZE = 60;
+var NIMBUS_X = 0; // set relative to width
+var SPEEDUP_INTERVAL = 10000; // ms
+var SPEEDUP_AMOUNT = 0.55;
+var MAX_SPEED_MULT = 2.6;
+
+var groundY = 0;
+
+/* ---------- State ---------- */
+var STATE_START = 0, STATE_PLAY = 1, STATE_OVER = 2;
+var state = STATE_START;
+
+var highScore = 0;
+try{ highScore = parseInt(localStorage.getItem('nimbusRunnerHighScore') || '0', 10) || 0; }catch(e){ highScore = 0; }
+
+var score = 0;
+var speedMult = 1;
+var elapsedSinceSpeedup = 0;
+var lastTime = 0;
+
+var player, obstacles, collectibles, clouds, planks;
+var bgScrollX = 0, floorScrollX = 0;
+
+function resetGame(){
+  score = 0;
+  speedMult = 1;
+  elapsedSinceSpeedup = 0;
+  player = {
+    x: Math.max(70, W*0.16),
+    y: groundY - NIMBUS_SIZE,
+    vy: 0,
+    onGround: true,
+    jumping: false,
+    bobT: 0,
+    squash: 1,
+    stretch: 1,
+    rot: 0
+  };
+  obstacles = [];
+  collectibles = [];
+  spawnTimer = 900;
+  collectTimer = 1400;
+}
+
+function initEnvironment(){
+  clouds = [];
+  for(var i=0;i<5;i++){
+    clouds.push({
+      x: Math.random()*W,
+      y: 30 + Math.random()* (H*0.35),
+      scale: 0.6 + Math.random()*0.9,
+      speed: 0.2 + Math.random()*0.35
+    });
+  }
+  planks = [];
+  var plankW = 70;
+  var count = Math.ceil(W/plankW)+3;
+  for(var j=0;j<count;j++){
+    planks.push({ x: j*plankW, w: plankW, alt: j%2===0 });
+  }
+}
+
+var spawnTimer = 900;
+var collectTimer = 1400;
+
+/* ---------- Obstacles ---------- */
+var OBSTACLE_DEFS = [
+  { key: 'small', img: function(){ return houseSmallImg; }, ready: function(){ return houseSmallReady; }, w: 65, h: 80, weight: 5, color: '#8C4A2F' },
+  { key: 'large', img: function(){ return houseBigImg; }, ready: function(){ return houseBigReady; }, w: 69, h: 78, weight: 3, color: '#A6402F' },
+  { key: 'van',   img: function(){ return vanImg; },       ready: function(){ return vanReady; },       w: 99, h: 60,  weight: 2, color: '#7A7A7A' }
+];
+var OBSTACLE_WEIGHT_TOTAL = OBSTACLE_DEFS.reduce(function(sum,d){ return sum + d.weight; }, 0);
+
+function pickObstacleDef(){
+  var r = Math.random() * OBSTACLE_WEIGHT_TOTAL;
+  for(var i=0;i<OBSTACLE_DEFS.length;i++){
+    r -= OBSTACLE_DEFS[i].weight;
+    if(r <= 0) return OBSTACLE_DEFS[i];
+  }
+  return OBSTACLE_DEFS[0];
+}
+
+function spawnObstacle(){
+  var def = pickObstacleDef();
+  obstacles.push({
+    x: W + 40,
+    y: groundY - def.h,
+    w: def.w,
+    h: def.h,
+    def: def,
+    passed: false
+  });
+}
+
+/* ---------- Collectibles ---------- */
+var TILE_COLORS = ['#013D3F', '#F4931F', '#10888C'];
+function spawnCollectible(){
+  var size = 26;
+  var jumpApexOffset = 90 + Math.random()*40;
+  collectibles.push({
+    x: W + 40,
+    y: groundY - size - jumpApexOffset,
+    size: size,
+    color: TILE_COLORS[Math.floor(Math.random()*TILE_COLORS.length)],
+    collected: false,
+    sparkleT: 0,
+    rot: 0
+  });
+}
+
+/* ---------- Input ---------- */
+function doJump(){
+  if(state === STATE_START){
+    startGame();
+    return;
+  }
+  if(state === STATE_OVER){
+    return;
+  }
+  if(state === STATE_PLAY && player.onGround && !player.jumping){
+    player.vy = JUMP_VELOCITY;
+    player.onGround = false;
+    player.jumping = true;
+    sfxJump();
+  }
+}
+
+window.addEventListener('keydown', function(e){
+  if(e.code === 'Space' || e.key === ' ' || e.key === 'Spacebar'){
+    e.preventDefault();
+    ensureAudio();
+    doJump();
+  }
+});
+
+function pointerHandler(e){
+  e.preventDefault();
+  ensureAudio();
+  doJump();
+}
+canvas.addEventListener('touchstart', pointerHandler, {passive:false});
+canvas.addEventListener('mousedown', pointerHandler);
+document.getElementById('gameWrap').addEventListener('touchmove', function(e){ e.preventDefault(); }, {passive:false});
+
+document.getElementById('playAgainBtn').addEventListener('click', function(e){
+  e.stopPropagation();
+  ensureAudio();
+  startGame();
+});
+document.getElementById('playAgainBtn').addEventListener('touchend', function(e){
+  e.stopPropagation();
+  e.preventDefault();
+  ensureAudio();
+  startGame();
+});
+
+/* ---------- State transitions ---------- */
+function startGame(){
+  resetGame();
+  state = STATE_PLAY;
+  document.getElementById('startScreen').style.display = 'none';
+  document.getElementById('gameOverScreen').style.display = 'none';
+}
+
+function endGame(){
+  state = STATE_OVER;
+  sfxGameOver();
+  if(score > highScore){
+    highScore = score;
+    try{ localStorage.setItem('nimbusRunnerHighScore', String(highScore)); }catch(e){}
+  }
+  document.getElementById('finalScore').textContent = 'Score: ' + Math.floor(score);
+  document.getElementById('finalHigh').textContent = 'Best: ' + Math.floor(highScore);
+  document.getElementById('hiScore').textContent = 'Best: ' + Math.floor(highScore);
+  document.getElementById('gameOverScreen').style.display = 'flex';
+}
+
+/* ---------- Update ---------- */
+function update(dt){
+  var speed = GROUND_SPEED_BASE * speedMult;
+
+  // scrolling background/floor
+  floorScrollX -= speed;
+  bgScrollX -= speed * 0.3;
+
+  if(state !== STATE_PLAY) return;
+
+  // speed ramp
+  elapsedSinceSpeedup += dt;
+  if(elapsedSinceSpeedup >= SPEEDUP_INTERVAL){
+    elapsedSinceSpeedup -= SPEEDUP_INTERVAL;
+    speedMult = Math.min(MAX_SPEED_MULT, speedMult + SPEEDUP_AMOUNT*0.18);
+  }
+
+  // score
+  score += dt * 0.01 * speedMult;
+  document.getElementById('scorePill').textContent = Math.floor(score);
+
+  // player physics
+  player.vy += GRAVITY;
+  player.y += player.vy;
+  if(player.y >= groundY - NIMBUS_SIZE){
+    player.y = groundY - NIMBUS_SIZE;
+    if(!player.onGround){
+      // landed
+    }
+    player.vy = 0;
+    player.onGround = true;
+    player.jumping = false;
+  }
+
+  // bob animation when on ground
+  if(player.onGround){
+    player.bobT += dt * 0.008;
+    player.squash = 1;
+    player.stretch = 1;
+    player.rot = 0;
+  } else {
+    // squash/stretch based on velocity direction
+    if(player.vy < 0){
+      player.stretch = 1.12;
+      player.squash = 0.9;
+    } else {
+      player.stretch = 0.92;
+      player.squash = 1.1;
+    }
+    player.rot = Math.max(-8, Math.min(8, player.vy * 0.5));
+  }
+
+  // spawn obstacles
+  spawnTimer -= dt;
+  if(spawnTimer <= 0){
+    spawnObstacle();
+    var base = 900 - speedMult*160;
+    spawnTimer = Math.max(420, base) + Math.random()*380;
+  }
+
+  // spawn collectibles
+  collectTimer -= dt;
+  if(collectTimer <= 0){
+    spawnCollectible();
+    collectTimer = 1600 + Math.random()*1200;
+  }
+
+  // update obstacles
+  for(var i=obstacles.length-1;i>=0;i--){
+    var o = obstacles[i];
+    o.x -= speed;
+    if(o.x + o.w < -20){
+      obstacles.splice(i,1);
+      continue;
+    }
+    // collision (slightly forgiving hitbox)
+    var pad = 10;
+    var pl = player.x+pad, pr = player.x+NIMBUS_SIZE-pad, pt = player.y+pad, pb = player.y+NIMBUS_SIZE-pad;
+    var ol = o.x+4, or_ = o.x+o.w-4, ot = o.y+2, ob = o.y+o.h;
+    if(pr > ol && pl < or_ && pb > ot && pt < ob){
+      endGame();
+    }
+  }
+
+  // update collectibles
+  for(var k=collectibles.length-1;k>=0;k--){
+    var cItem = collectibles[k];
+    cItem.x -= speed;
+    cItem.rot += dt*0.002;
+    if(!cItem.collected && cItem.x + cItem.size < -20){
+      collectibles.splice(k,1);
+      continue;
+    }
+    if(!cItem.collected){
+      var cl = player.x+6, cr = player.x+NIMBUS_SIZE-6, ct = player.y+6, cb = player.y+NIMBUS_SIZE-6;
+      var tl = cItem.x, tr = cItem.x+cItem.size, tt = cItem.y, tb = cItem.y+cItem.size;
+      if(cr > tl && cl < tr && cb > tt && ct < tb){
+        cItem.collected = true;
+        cItem.sparkleT = 400;
+        score += 10;
+        sfxCollect();
+      }
+    } else {
+      cItem.sparkleT -= dt;
+      if(cItem.sparkleT <= 0){
+        collectibles.splice(k,1);
+      }
+    }
+  }
+}
+
+/* ---------- Draw helpers ---------- */
+function drawBackground(){
+  if(!bgReady){
+    ctx.fillStyle = '#EDFAFF';
+    ctx.fillRect(0,0,W,groundY);
+    return;
+  }
+  var iw = bgImg.naturalWidth, ih = bgImg.naturalHeight;
+  var drawH = groundY;
+  var drawW = drawH * (iw/ih);
+  var offset = bgScrollX % drawW;
+  if(offset > 0) offset -= drawW;
+  for(var x = offset; x < W; x += drawW){
+    ctx.drawImage(bgImg, x, 0, drawW, drawH);
+  }
+}
+
+function drawCloud(x,y,scale){
+  ctx.save();
+  ctx.translate(x,y);
+  ctx.scale(scale,scale);
+  ctx.beginPath();
+  ctx.arc(0,0,16,0,Math.PI*2);
+  ctx.arc(18,-8,14,0,Math.PI*2);
+  ctx.arc(34,0,16,0,Math.PI*2);
+  ctx.arc(17,8,18,0,Math.PI*2);
+  ctx.fill();
+  ctx.restore();
+}
+
+function drawGround(){
+  var groundH = H - groundY;
+  if(!floorReady){
+    ctx.fillStyle = '#A66B2A';
+    ctx.fillRect(0, groundY, W, groundH);
+    return;
+  }
+  var iw = floorImg.naturalWidth, ih = floorImg.naturalHeight;
+  var drawH = groundH;
+  var drawW = drawH * (iw/ih);
+  var offset = floorScrollX % drawW;
+  if(offset > 0) offset -= drawW;
+  var tileW = Math.ceil(drawW) + 1;
+  for(var x = offset; x < W; x += drawW){
+    ctx.drawImage(floorImg, Math.round(x), groundY, tileW, drawH);
+  }
+  ctx.fillStyle = 'rgba(1,61,63,0.25)';
+  ctx.fillRect(0, groundY, W, 2);
+}
+
+function drawObstacle(o){
+  var def = o.def;
+  if(!def) return;
+  if(def.ready()){
+    var img = def.img();
+    var iw = img.naturalWidth || o.w, ih = img.naturalHeight || o.h;
+    var ratio = iw/ih;
+    var drawH = o.h, drawW = o.h*ratio;
+    if(drawW > o.w){ drawW = o.w; drawH = o.w/ratio; }
+    var dx = o.x + (o.w-drawW)/2;
+    var dy = o.y + (o.h-drawH);
+    ctx.drawImage(img, dx, dy, drawW, drawH);
+  } else {
+    ctx.fillStyle = def.color || '#8C4A2F';
+    roundRect(o.x, o.y, o.w, o.h, 6);
+    ctx.fill();
+  }
+}
+
+function roundRect(x,y,w,h,r){
+  ctx.beginPath();
+  ctx.moveTo(x+r,y);
+  ctx.arcTo(x+w,y,x+w,y+h,r);
+  ctx.arcTo(x+w,y+h,x,y+h,r);
+  ctx.arcTo(x,y+h,x,y,r);
+  ctx.arcTo(x,y,x+w,y,r);
+  ctx.closePath();
+}
+
+function drawCollectible(c){
+  ctx.save();
+  var cx = c.x + c.size/2, cy = c.y + c.size/2;
+  ctx.translate(cx,cy);
+  var floatOffset = Math.sin((c.rot||0)*3) * 3;
+  ctx.translate(0, floatOffset);
+  ctx.rotate(Math.sin((c.rot||0))*0.15);
+  ctx.fillStyle = c.color;
+  roundRect(-c.size/2,-c.size/2,c.size,c.size,5);
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(255,255,255,0.6)';
+  ctx.lineWidth = 2;
+  ctx.stroke();
+  ctx.restore();
+
+  if(c.collected && c.sparkleT > 0){
+    var alpha = Math.max(0, c.sparkleT/400);
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.strokeStyle = '#FFFFFF';
+    ctx.lineWidth = 2;
+    var rad = (1-alpha)*30 + 10;
+    for(var i=0;i<6;i++){
+      var ang = (Math.PI*2/6)*i;
+      ctx.beginPath();
+      ctx.moveTo(cx+Math.cos(ang)*rad*0.4, cy+Math.cos(ang)*0+Math.sin(ang)*rad*0.4);
+      ctx.lineTo(cx+Math.cos(ang)*rad, cy+Math.sin(ang)*rad);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+}
+
+function drawPlayer(){
+  var bob = 0;
+  if(player.onGround){
+    bob = Math.sin(player.bobT*6) * 4;
+  }
+  var size = NIMBUS_SIZE;
+  var w = size * player.squash;
+  var h = size * player.stretch;
+  var cx = player.x + size/2;
+  var cy = player.y + size/2 - bob;
+
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.rotate((player.rot||0) * Math.PI/180);
+  if(nimbusReady){
+    var iw = nimbusImg.naturalWidth || 512;
+    var ih = nimbusImg.naturalHeight || 512;
+    var ratio = iw/ih;
+    var drawH = h;
+    var drawW = h*ratio;
+    if(drawW > w){ drawW = w; drawH = w/ratio; }
+    ctx.drawImage(nimbusImg, -drawW/2, -drawH/2, drawW, drawH);
+  } else {
+    ctx.fillStyle = '#10888C';
+    roundRect(-w/2, -h/2, w, h, 12);
+    ctx.fill();
+  }
+  ctx.restore();
+}
+
+function drawSadPlayer(x,y){
+  var size = NIMBUS_SIZE;
+  ctx.save();
+  ctx.translate(x+size/2, y+size/2);
+  ctx.rotate(-18 * Math.PI/180);
+  if(nimbusReady){
+    var iw = nimbusImg.naturalWidth || 512;
+    var ih = nimbusImg.naturalHeight || 512;
+    var ratio = iw/ih;
+    var drawH = size;
+    var drawW = size*ratio;
+    ctx.globalAlpha = 0.95;
+    ctx.drawImage(nimbusImg, -drawW/2, -drawH/2, drawW, drawH);
+  } else {
+    ctx.fillStyle = '#10888C';
+    ctx.globalAlpha = 0.95;
+    roundRect(-size/2, -size/2, size, size, 12);
+    ctx.fill();
+  }
+  ctx.restore();
+}
+
+/* ---------- Main loop ---------- */
+function frame(ts){
+  if(!lastTime) lastTime = ts;
+  var dt = Math.min(40, ts - lastTime);
+  lastTime = ts;
+
+  update(dt);
+
+  ctx.clearRect(0,0,W,H);
+  drawBackground();
+  drawGround();
+
+  for(var i=0;i<obstacles.length;i++) drawObstacle(obstacles[i]);
+  for(var k=0;k<collectibles.length;k++) drawCollectible(collectibles[k]);
+
+  if(state === STATE_OVER){
+    drawSadPlayer(player.x, player.y);
+  } else {
+    drawPlayer();
+  }
+
+  requestAnimationFrame(frame);
+}
+
+/* ---------- Init ---------- */
+function init(){
+  resize();
+  initEnvironment();
+  player = {
+    x: Math.max(70, W*0.16),
+    y: groundY - NIMBUS_SIZE,
+    vy: 0,
+    onGround: true,
+    jumping: false,
+    bobT: 0,
+    squash: 1,
+    stretch: 1,
+    rot: 0
+  };
+  obstacles = [];
+  collectibles = [];
+
+  document.getElementById('hiScore').textContent = 'Best: ' + Math.floor(highScore);
+  var startBest = document.getElementById('startBest');
+  if(highScore > 0){
+    startBest.textContent = 'Best score: ' + Math.floor(highScore);
+  }
+  var isTouch = ('ontouchstart' in window) || navigator.maxTouchPoints > 0;
+  document.getElementById('startPrompt').textContent = isTouch ? 'Tap to Start' : 'Press Space to Start';
+
+  requestAnimationFrame(frame);
+}
+
+init();
+
+})();
+</script>
+</body>
+</html>
